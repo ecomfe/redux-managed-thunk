@@ -1,0 +1,10 @@
+{
+    "files": [
+        "src"
+    ],
+    "eslint": {
+        "rules": {
+            "fecs-valid-jsdoc": false
+        }
+    }
+}
