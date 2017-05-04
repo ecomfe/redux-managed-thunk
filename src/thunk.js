@@ -14,22 +14,25 @@ import {bypass} from './consumer';
  *
  * @param {Object} [options] options
  * @param {Function} [options.consumer] a custom consumer function to handle all thunks
+ * @param {boolean} [options.loose = false] when set to `true`, `dispatch` will still be usable after thunk finishes
  * @return {Function} a redux middleware function
  */
-export default ({consumer = bypass()} = {}) => ({dispatch, getState}) => {
-    let runThunk = thunk => {
-        let [wrappedDispatch, replaceDispatch] = createDispatch(dispatch);
-        let thunkResult = thunk(wrappedDispatch, getState);
+export default ({consumer = bypass(), loose = false} = {}) => ({dispatch, getState}) => {
+    let runThunk = loose
+        ? thunk => thunk(dispatch, getState)
+        : thunk => {
+            let [wrappedDispatch, replaceBehavior] = createDispatch(dispatch);
+            let thunkResult = thunk(wrappedDispatch, getState);
 
-        if (isPromise(thunkResult)) {
-            thunkResult.then(() => replaceDispatch(error('Unable to call dispatch after async thunk resolves')));
-        }
-        else {
-            replaceDispatch(error('Unable to call dispatch after sync thunk returns'));
-        }
+            if (isPromise(thunkResult)) {
+                thunkResult.then(() => replaceBehavior(error('Unable to call dispatch after async thunk resolves')));
+            }
+            else {
+                replaceBehavior(error('Unable to call dispatch after sync thunk returns'));
+            }
 
-        return thunkResult;
-    };
+            return thunkResult;
+        };
 
     let consume = consumer(runThunk);
 

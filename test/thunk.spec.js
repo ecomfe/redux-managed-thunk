@@ -53,11 +53,31 @@ describe('managedThunk', () => {
         });
     });
 
+    it('should not throw when call dispatch after sync thunk returns in loose mode', done => {
+        let {store, dispatch} = applyThunk({loose: true});
+        dispatch(dispatch => {
+            setImmediate(() => {
+                expect(() => dispatch({type: 'TEST'})).not.to.throw()
+                done();
+            });
+        });
+    });
+
     it('should throw error when call dispatch after async thunk resolves', done => {
         let {store, dispatch} = applyThunk();
         dispatch(async dispatch => {
             setImmediate(() => {
                 expect(() => dispatch({type: 'TEST'})).to.throw()
+                done();
+            });
+        });
+    });
+
+    it('should not throw error when call dispatch after async thunk resolves in loose mode', done => {
+        let {store, dispatch} = applyThunk({loose: true});
+        dispatch(async dispatch => {
+            setImmediate(() => {
+                expect(() => dispatch({type: 'TEST'})).not.to.throw()
                 done();
             });
         });
