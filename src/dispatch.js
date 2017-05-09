@@ -13,6 +13,7 @@
  */
 export let error = message => (/* dispatch */) => action => {
     let error = new Error(message);
+    // This is currently a experimental feature, future changes are possible
     error.dispatchingAction = action;
     throw error;
 };

@@ -8,6 +8,11 @@
 import isPromise from 'is-promise';
 
 /**
+ * Empty function
+ */
+export let noop = () => {};
+
+/**
  * Partially apply function with one fixed argument, only accept one argument
  *
  * @param {Function} fn function to apply
@@ -27,9 +32,70 @@ export let doAndThen = (job, next) => {
     let result = job();
 
     if (isPromise(result)) {
-        result.then(next);
+        return result.then(next);
     }
-    else {
-        next(result);
+
+    return next(result);
+};
+
+// Forked from [react-redux](https://github.com/reactjs/react-redux/blob/master/src/utils/shallowEqual.js)
+/* istanbul ignore next */
+let hasOwn = Object.prototype.hasOwnProperty;
+
+/* eslint-disable fecs-arrow-body-style */
+let is = (() => {
+    /* istanbul ignore next */
+    return (x, y) => {
+        if (x === y) {
+            return x !== 0 || y !== 0 || 1 / x === 1 / y;
+        }
+
+        /* eslint-disable no-self-compare */
+        return x !== x && y !== y;
+        /* eslint-enable no-self-compare */
+    };
+})();
+
+let shallowEqual = (() => {
+    /* istanbul ignore next */
+    return (objA, objB) => {
+        if (is(objA, objB)) {
+            return true;
+        }
+
+        if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+            return false;
+        }
+
+        let keysA = Object.keys(objA);
+        let keysB = Object.keys(objB);
+
+        if (keysA.length !== keysB.length) {
+            return false;
+        }
+
+        for (let i = 0; i < keysA.length; i++) {
+            if (!hasOwn.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+})();
+/* eslint-enable fecs-arrow-body-style */
+
+export let argsEqual = (x, y) => {
+    // `args` are arrays and are never reference equal
+    if (x.length !== y.length) {
+        return false;
     }
+
+    for (let i = 0; i < x.length; i++) {
+        if (!shallowEqual(x[i], y[i])) {
+            return false;
+        }
+    }
+
+    return true;
 };

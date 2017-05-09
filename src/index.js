@@ -10,3 +10,4 @@ export default thunk;
 
 export * from './dispatch';
 export * from './consumer';
+export * from './hotc';

@@ -4,8 +4,8 @@
   "description": "redux thunk with managed behaviors",
   "main": "index.js",
   "scripts": {
-    "test": "cross-env NODE_ENV=test mocha",
     "lint": "fecs",
+    "test": "cross-env NODE_ENV=test mocha",
     "test-cov": "npm run lint && cross-env NODE_ENV=test nyc --reporter=text --reporter=lcov --reporter=html mocha"
   },
   "repository": {
