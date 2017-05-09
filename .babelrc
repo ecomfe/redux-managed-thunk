@@ -1,13 +1,18 @@
 {
     "env": {
+        "development": {
+            "presets": ["es2015-rollup", "stage-3"]
+        },
+        "production": {
+            "presets": ["es2015-rollup", "stage-3"]
+        },
         "test": {
-            "presets": [
-                "stage-3"
-            ],
-            "plugins": [
-                "transform-es2015-modules-umd",
-                "istanbul"
-            ]
+            "presets": ["stage-3"],
+            "plugins": ["transform-es2015-modules-umd", "istanbul"]
+        },
+        "example": {
+            "presets": ["stage-3"],
+            "plugins": ["transform-es2015-modules-umd"]
         }
     }
 }
