@@ -63,6 +63,8 @@
     "instrument": false
   },
   "dependencies": {
-    "is-promise": "^2.1.0"
+    "is-promise": "^2.1.0",
+    "redux": "^3.6.0",
+    "redux-optimistic-manager": "^2.0.0"
   }
 }

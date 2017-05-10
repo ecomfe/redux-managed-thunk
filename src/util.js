@@ -38,6 +38,10 @@ export let doAndThen = (job, next) => {
     return next(result);
 };
 
+let toString = Object.prototype.toString;
+
+export let isArray = value => toString.call(value) === '[object Array]';
+
 // Forked from [react-redux](https://github.com/reactjs/react-redux/blob/master/src/utils/shallowEqual.js)
 /* istanbul ignore next */
 let hasOwn = Object.prototype.hasOwnProperty;
