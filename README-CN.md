@@ -2,7 +2,22 @@
 
 redux-managed-thunk是一个redux中间件，基于thunk提供了强大的异步管理功能。
 
-## 一些想法
+- [基本理念](#基本理念)
+- [基本使用方式](#基本使用方式)
+- [dispatch可用性限制](#dispatch可用性限制)
+- [使用consumer扩展中间件](#使用consumer扩展中间件)
+    - [节流与串行化](#节流与串行化)
+    - [依赖注入](#依赖注入)
+    - [组合consumer](#组合consumer)
+    - [自定义consumer](#自定义consumer)
+- [高阶ThunkCreator](#高阶thunk-creator)
+    - [复用前次Thunk](#复用前次thunk)
+    - [取消前次Thunk](#取消前次thunk)
+    - [事务化Thunk](#事务化thunk)
+    - [自定义高阶ThunkCreator](#自定义高阶thunk-creator)
+- [乐观UI支持](#乐观ui支持)
+
+## 基本理念
 
 该中间件在设计的过程中进行过多次的变更，也在[redux-thunk](https://github.com/gaearon/redux-thunk)、[redux-promise](https://github.com/acdlite/redux-promise)、[redux-generator](https://github.com/xuyuanxiang/redux-generator)之间进行过比较和取舍，最终以现在的形式出现，这其中有着很多的考虑。
 
@@ -34,58 +49,35 @@ let saveTodo = todo => async dispatch => {
 - 标准支持，符合所有人的预期。
 - ES2018后由语法上的`async`和`await`支持，配合`Promise.all`等方法易于进行异步流控制。
 
-### 为什么不使用迭代器
+## 基本使用方式
 
-从“一个业务流程中，分阶段地派发多个Action”这个逻辑角度而言，迭代器是一个很好的解决方案，并且标准已经有[异步迭代器](https://github.com/tc39/proposal-async-iteration)将迭代与异步进行整合。
+通过npm或yarn进行安装：
 
-但是在实际的开发中，我们面对的往往是各种各样的流（Stream）和事件（Event），将这两者转换为迭代器是非常复杂的，例如：
-
-```javascript
-let fetchList = async function* () {
-    let xhr = ajax('/list?ndjson');
-    // 很显然并不能在事件处理函数中使用yield，那么这代码就不能用
-    xhr.onprogress = line => yield {type: 'ADD_ITEM', payload: JSON.parse(line)};
-};
+```shell
+npm install --save redux-managed-thunk
+# 或者
+yarn add redux-managed-thunk
 ```
 
-```javascript
-let fetchList = () => {
-    let xhr = ajax('/list?ndjson');
-    xhr.onprogress = line => {
-        // 如果自己实现迭代器，这里的实现又会相当复杂
-    };
-
-    return {
-        [Symbol.asyncIterator]: {
-            next() {
-                // 如何与事件整合起来
-            }
-        }
-    }
-};
-```
-
-因此，迭代器并不适合与组织实际的业务逻辑。
-
-## Thunk类型
-
-在redux-managed-thunk中，你可以通过`dispatch`派发函数，这一点上与[redux-thunk](https://github.com/gaearon/redux-thunk)一致。但是redux-managed-thunk在执行异步逻辑时，需要返回一个Promise对象用以标记流程的状态。
-
-大部分时候，只需要将thunk标记为`async`即可复用语言特性达到返回Promise的目的：
+redux-managed-thunk的默认export为一个中间件创建函数，调用可产生一个中间件，随后通过`applyMiddleware`使用即可：
 
 ```javascript
-import {post} from 'http-api';
+import {createStore, applyMiddleware} from 'redux';
+import managedThunk from 'redux-managed-thunk';
 
-// 本身的实现和redux-thunk一模一样
-let saveTodo = todo => async dispatch => {
-    dispatch({type: 'SAVE_START'});
-
-    let savedTodo = await post('/todos', todo);
-    dispatch(type: 'ADD_TODO', payload: savedTodo);
-
-    dispatch {type: 'SAVE_DONE'};
-}
+let store = createStore(
+    reducer,
+    preloadedState,
+    applyMiddleware(managedThunk())
+);
 ```
+
+注意与redux-thunk不同的是，`managedThunk`是一个“创建中间件的函数”，而非一个中间件，所以需要进行一次调用。`managedThunk`函数还接受一个`options`参数，包含以下的属性：
+
+- `{boolean} loose`：用于开启宽松模式，具体参考[dispatch可用性限制](#dispatch可用性限制)章节。
+- `{Function} consumer`：用于控制thunk的派发逻辑，具体参考[使用consumer扩展中间件](#使用consumer扩展中间件)章节。
+
+## dispatch可用性限制
 
 redux-managed-thukn会对`dispatch`参数增加一些限制：
 
@@ -94,13 +86,42 @@ redux-managed-thukn会对`dispatch`参数增加一些限制：
 
 进行额外的检测并抛出异常是为了帮助应用更好地管理异步过程，避免未知时机的`dispatch`调用产生不可预期的应用状态。
 
-## 管理thunk
+如果你希望兼容redux-thunk的方式，任意使用`dispatch`不受限制，那么在创建中间件的时候传入`{loose: true}`参数即可：
 
-redux-managed-thunk允许从2个层面对thunk的执行进行管理。
+```javascript
+import {createStore, applyMiddleware} from 'redux';
+import managedThunk from 'redux-managed-thunk';
 
-### 全局thunk派发
+let store = createStore(
+    reducer,
+    preloadedState,
+    applyMiddleware(managedThunk({loose: true}))
+);
+```
 
-redux-managed-thunk允许自定义`consumer`函数对所有派发的thunk的执行方式进行管理，在调用`managedThunk`创建中间件时提供参数即可，如：
+## 使用consumer扩展中间件
+
+redux-managed-thunk允许自定义`consumer`函数对所有派发的thunk的执行方式进行管理，在调用`managedThunk`创建中间件时提供参数即可。本库内置了一系列常用的cosumer函数。
+
+### 节流与串行化
+
+使用`cocurrency`函数可以支持“同一时间最多同时派发N个thunk”的管理逻辑：
+
+```javascript
+cocurrency = ({number} limit) => Function
+```
+
+如我们为了控制服务器端的压力，允许同一时间最多派发4个thunk：
+
+
+```javascript
+import {managedThunk, cocurrency} from 'redux-managed-thunk';
+import {applyMiddleware} from 'redux';
+
+applyMiddleWare(managedThunk(null, {consumer: cocurrency(4)}));
+```
+
+也可以使用`series`函数来将所有thunk串行化（相当于`cocurrency(1)`），这在类似electron这类renderer和main交互速度很快的应用中能起到简单防止竞态（Race Condition）的作用：
 
 ```javascript
 import {managedThunk, series} from 'redux-managed-thunk';
@@ -109,151 +130,230 @@ import {applyMiddleware} from 'redux';
 applyMiddleWare(managedThunk(null, {consumer: series()}));
 ```
 
-以上代码使用`series`处理所有派发的thunk，其逻辑是将逻辑的执行串行化，前一个thunk结束前，后续的thunk必须排队等待。
+### 依赖注入
 
-除此之外，可以使用更多的函数组织对thunk的派发逻辑：
+使用`inject`和`injectWith`函数可以对thunk的参数进行注入，效果类似于redux-thunk的`withExtraArgument`函数的功能：
 
 ```javascript
-import {managedThunk, series, inject, reduceConsumers} from 'redux-managed-thunk';
+inject = ({...any} extraArguments) => Function
+injectWith ({...Function} factories) => Function
+```
+
+两者的区别在于`injectWith`的参数为若干个函数，在每一次thunk执行时会运行这些函数并使用其返回值作为参数注入到thunk中，而`inject`则直接将值作为参数。`injectWith`的工厂函数并不支持异步。
+
+```javascript
+import {managedThunk, injectWith} from 'redux-managed-thunk';
+import {identity} from 'lodash';
 import {applyMiddleware} from 'redux';
 
 let api = {
     // ...
 };
-applyMiddleWare(managedThunk({consumer: reduceConsumers(inject(api), series())}));
-```
+let getCurrentUser = () => window.currentUser || null;
 
-以上代码通过`reduceConsumers`函数将`inject`和`series`整合在一起，形成的逻辑为“执行时额外提供一个`api`参数，并且所有thunk按顺序依次派发”。
+applyMiddleWare(managedThunk(null, {consumer: injectWith(identity(api), getCurrentUser)}));
 
-你也可以编写自己的`consumer`函数，每一个`consumer`函数符合以下签名：
+// 随后thunk可以获取参数
+let invalidCurrentUser = async (dispatch, getState, api, currentUser) => {
+    if (!currentUser) {
+        window.currentUser = await api.getCurrentUser();
+        return dispatch(thunk);
+    }
 
-```javascript
-let consumer = run => thunk => {
-    // 调用run(thunk)即可执行thunk
-    //
-    // 返回Promise则表示异步
+    dispatch({type: 'INVALID_USER', payload: currentUser});
 };
 ```
 
-如内置的`inject`用于为所有的thunk提供额外的参数，可以实现类似redux-thunk的`extraArgument`的效果，并且具备更好的灵活性（允许多个参数），其实现简单地对传入的`thunk`进行包装增加额外参数：
+### 组合consumer
+
+使用`reduceConsumers`函数可以将多个consumer组合为一个，如同时需要`inject`和`series`功能：
 
 ```javascript
-export let inject = (...extraArguments) => run => thunk => {
-    let withInjection = (...args) => thunk(...args, ...extraArguments);
-    run(withInjection);
+import {managedThunk, series, inject, reducerConsumers} from 'redux-managed-thunk';
+import {identity} from 'lodash';
+import {applyMiddleware} from 'redux';
+
+let api = {
+    // ...
+};
+
+applyMiddleWare(managedThunk(null, {consumer: reducerConsumers(series(), inject(api))}));
+```
+
+### 自定义consumer
+
+你可以任意自定义consumer函数，一个consumer函数符合以下签名：
+
+```javascript
+consumer = ({Function} run) => ({Function({Function} thunk)}) => any;
+```
+
+其接收一个`run`函数，该函数仅接收一个`thunk`函数并返回其执行结果。一个consumer函数在接收到thunk后如无意外应当返回thunk的执行结果（`any`）。
+
+以下示例为一个允许函数异步返回依赖的`injectWith`函数：
+
+```javascript
+let injectWithAsync(...factories) => run => async thunk => {
+    let extraArguments = await Promise.all(factories.map(fn => fn()));
+    let injectedThunk = (...args) => thunk(...args, ...extraArguments);
+    return run(injectedThunk);
 };
 ```
 
-如果考虑到使用大量的可变参数会使性能下降，那么在**确认thunk的签名不变**的前提下，可以很简单地实现一个简化版本：
+## 高阶Thunk Creator
+
+一个Thunk符合以下签名：
 
 ```javascript
-export let inject = extraArgument => run => thunk => {
-    let withInjection = (dispatch, getState) => thunk(dispatch, getState, extraArgument);
-    run(withInjection);
+Thunk = ({Function} dispatch, {Function} getState, {...Function} extraArguments) => any
+```
+
+一个Thunk Creator是一个创建Thunk的函数：
+
+```javascript
+ThunkCreator = ({...any} arguments) => Thunk
+```
+
+一个高阶Thunk Creator则是一个高阶函数，其接收一个Thunk Creator并返回一个新的Thunk Creator，用以添加一些可复用的行为：
+
+```javascript
+higherOrderThunkCreator = ({ThunkCreator} next) => ThunkCreator
+```
+
+redux-managed-thunk内置了几个常用的高阶ThunkCreator用于在Thunk级别对流程进行管理。
+
+### 复用前次Thunk
+
+在基于HTTP协议的应用中，对于一些假定幂等的请求（如`GET`），当其参数相同时，我们往往没有必要重复发起请求。`reusePrevious`提供了复用前次的功能，当前一次的thunk仍在运行中，则不会执行新的thun，而是将前一次的结果（`Promise`）直接返回。
+
+`reusePrevious`接收的`options`参数有如下属性：
+
+- `{Function} shouldReuse`：接受`(currentArgs, previousArgs)`并返回`boolean`来确定是否可以重用前次执行，默认实现为对前后的参数一一进行`shallowEqual`的比较。
+
+```javascript
+import {reusePrevious} from 'redux-managed-thunk';
+
+let equal = (x, y) => x === y;
+let fetchUser = id => async dispatch => {
+    let user = http.get(`/users/${id}`);
+    dispatch({type: 'USER_ARRIVE', payload: user});
 };
+fetchUser = reusePrevious({shouldReuse: equal})(fetchUser);
+
+fetchUser(123);
+// 并不会执行，直接复用前一次的请求，最后仅有一次dispatch调用
+fetchUser(123);
 ```
 
-这一版本通过固定额外参数仅有一个并且保证在生效前没有其它类似`inject`的consumer改变thunk的参数可以获得更好的性能。
+### 取消前次Thunk
 
-### 单个thunk派发
+对于另一类逻辑，如`PUT`请求，后来者总会对前者的结果进行覆盖，因此当一个新的请求开始时，前一次的请求就不再有意义。`cancelPrevious`提供了取消前次的功能，当一个新的thunk开始执行时，前一次的执行产生的`dispatch`调用都将被忽略。
 
-对于不同的thunk，我们有时候也需要对其进行管理，常见的有：
+需要注意的是，事实上在JavaScript领域中我们是无法真正“取消”一个操作的，因此对于`cancelPrevious`来说它仅仅忽略了后续的`dispatch`调用，而在之前已经产生的`dispatch`也无法进行回滚。如果需要避免在取消前就产生某些`dispatch`调用，可以配合[`transactional`](#事务化Thunk)一起使用。另外如果有明确地取消请求的方法，则可以使用`cancel`选项来实现。
 
-- 对于类似GET只读资源的请求，如果同时调用N次，那么基于幂等性（虽然往往不现实），可以复用第一次请求的结果。
-- 对于类似PUT的更新请示，如果同时调用N次，那么应该最后一次生效，前面的调用可以被取消。
+`cancelPrevious`接收的`options`参数有如下属性：
 
-我们可以使用高阶Action Creator（Higher-order Action Creator）来实现这些：
-
-```javascript
-import {reusePrevious, cancelPrevious} from 'redux-managed-thunk';
-import {get, put} from 'http-api';
-
-let fetchTodo = id => async () => get(`/todos/${id}`);
-// 复用之前已经开始的thunk
-fetchTodo = reusePrevious(fetchTodo);
-
-let updateTodo = todo => async () => put(`/todos/${todo.id}`, todo);
-// 取消之前开始的thunk
-updateTodo = cancelPrevious(updateTodo);
-```
-
-使用不同的高阶函数可以产生不同的效果，如使用了`cancelPrevious`之后，当新的thunk开始执行时，之前未执行完的thunk所产生的Action都将被忽略（已产生的Action则已经生效）。
-
-同样，可以编写自己的高阶函数，高阶函数的签名为：
+- `{Function} shouldCancel`：接受`(currentArgs, previousArgs)`并返回`boolean`来确定是否可以重用前次执行，默认实现为对前后的参数一一进行`shallowEqual`的比较。
+- `{Function} cancel`：接受当前正在执行的`Promise`对象并完成实际的取消工作，默认为空函数。
 
 ```javascript
-// 接收一个Action Creator，返回一个新的Action Creator
-next => (...args) => (dispatch, getState) => {
-    // 实现对thunk的管理，需要时调用next
+import {reusePrevious} from 'redux-managed-thunk';
+
+let idEqual = (x, y) => x.id === y.id;
+let abortFetch = running => running.abort();
+let updateUser = user => async dispatch => {
+    let updating = http.put(`/users/${user.id}`, user);
+    updating.then(updatedUser => dispatch({type: 'USER_UPDATE', payload: updatedUser}));
+    return updating;
 };
+updateUser = cancelPrevious({shouldCancel: idEqual, cancel: abortFetch})(updateUser);
+
+updateUser({id: 123, name: 'x'});
+// 会立即取消前一次请求，仅将name更新至y
+updateUser({id: 123, name: 'y'});
 ```
 
-如`reusePrevious`的简单实现为：
+### 事务化Thunk
+
+`transactional`函数会将一次thunk运行过程中的所有`dispatch`调用暂存起来，在thunk运行成功后一次性派发。如果thunk运行失败（同步的抛出异常或异步地产生`Promsie#reject`），则所有的`dispatch`都将被丢弃：
 
 ```javascript
-let reusePrevious = next => {
-    let currentRunningTask = null;
-    let currentTaskInput = null;
+import {transactional} from 'redux-managed-thunk';
 
-    let clean = () => {
-        currentRunningTask = null;
-        currentTaskInput = null;
+let counter = 1;
+let decrementCounter = () => dispatch => {
+    dispatch({type: 'LOG', payload: 'decrementing...'});
+
+    if (counter === 0) {
+        throw new Error('Cannot decrement');
+    }
+
+    counter--;
+    dispatch({type: 'NEW_COUNTER', counter});
+    dispatch({type: 'LOG', payload: 'decremented'});
+};
+decrementCounter = transactional()(decrementCounter);
+
+decrementCounter();
+// 由于抛出异常，在事务中内容为"decrenmenting..."的日志不会产生
+decrementCounter();
+```
+
+### 自定义高阶Thunk Creator
+
+你也可以自己编写需要的高阶ThunkCreator，只需要符合接收一个ThunkCreator并返回新的ThunkCreator的签名即可，如下示例为让某个Thunk运行时在控制台显示函数已经弃用的信息：
+
+```javascript
+let deprecated = name => next => (...args) => {
+    let thunk = next(...args);
+    return (...thunkArgs) => {
+        console.warn(`${name} thunk is deprecated`);
+        return thunk(...thunkArgs);
     };
-
-    return (...args) => (dispatch, getState, extraArgument) => {
-        if (!currentRunningTask || !shallowEqual(args, currentTaskInput)) {
-            currentTaskInput = args;
-            currentRunningTask = next(...args)(dispatch, getState, extraArgument);
-            currentRunningTask.then(clean);
-        }
-
-        return currentRunningTask;
-    };
 };
-```
-
-而`cancelPrevious`则显得麻烦一些：
-
-```javascript
-let cancelPrevious = next => {
-    let cancelRunningTask = null;
-    let currentTaskInput = null;
-
-    let clean = () => {
-        cancelRunningTask = null;
-        currentTaskInput = null;
-    };
-
-    return (...args) => (dispatch, getState, extraArgument) => {
-        if (cancelRunningTask && shallowEqual(args, currentTaskInput)) {
-            cancelRunningTask();
-            clean();
-        }
-
-        let [cancelableDispatch, cancel] = (() => {
-            let canceled = false;
-
-            return [
-                action => canceled ? null : dispatch(action),
-                () => canceled = true
-            ];
-        })();
-
-        cancelRunningTask = cancel;
-        currentTaskInput = args;
-
-        let promise = next(...args)(cancelableDispatch, getState, extraArgument);
-        promise.then(clean);
-        return promise;
-    };
-};
+// myAPI = deprecated('myAPI')(myAPI);
 ```
 
 ## 乐观UI支持
 
-redux-managed-thunk同时支持乐观UI，只需将一个`[Function, Function]`形式的数组传递给`dispatch`函数即可，这个数组分为2项：
+redux-managed-thunk同时支持乐观UI，你可以使用`optimisticEnhancer`这一命名导出来打开乐观UI的支持。`optimisticEnhancer`是一个Redux StoreEnhancer，用于`createStore`的第3个参数：
 
-1. 第一项为redux-managed-thunk定义的标准thunk，考虑到乐观UI的特性，该thunk应当是一个异步函数，返回Promise对象。
-2. 第二项同样为一个thunk，但必须是同步函数。
+```javascript
+import {createStore} from 'redux';
 
-当接收到数组时，redux-managed-thunk会优先执行第2个thunk并派发产生的乐观Action更新应用状态，随后当第1个thunk的异步过程结束时，之前产生的乐观Action将被回滚，随后再通过新的Action将应用状态更新至最新。
+let store = createStore(reducer, preloadedState, optimisticEnhancer());
+```
+
+如果与其它的enhancer共用，则可以使用compose函数组合：
+
+
+```javascript
+import {createStore, compose} from 'redux';
+import logger from 'redux-logger';
+import saga from 'redux-saga';
+
+let store = createStore(
+    reducer,
+    preloadedState,
+    compose(
+        applyMiddleware(logger, saga),
+        optimisticEnhancer({/* options */})
+    )
+;
+```
+
+`optimisticEnhancer`函数接受一个`options`参数，参数定义与默认导出的`managedThunk`函数一致。
+
+乐观UI的使用方式与[redux-optimistic-thunk](https://github.com/ecomfe/redux-optimistic-thunk)相同，只需将一个`[Function, Function]`形式的数组传递给`dispatch`函数即可，这个数组分为2项：
+
+1. 第一项为redux-managed-thunk定义的标准thunk，考虑到乐观UI的特性，该thunk应当是一个异步函数，返回Promise对象。如果该函数为同步函数，则会抛出异常。
+2. 第二项同样为一个thunk，但必须是同步函数。如果该函数为异步函数，则会抛出异常。
+
+当接收到数组时，redux-managed-thunk会按以下步骤进行：
+
+1. 执行第1个thunk，此时该thunk**同步**产生的action都将生效。
+2. 执行第2个thunk，该thunk产生的action都将生效。
+3. 等待第1个thunk完成，随后回滚第2个thunk产生的action。
+4. 继续派发第1个thunk后续的action。
+
+redux-managed-thunk已经通过事务标注的形式处理了各个thunk之间的乱序问题，使用者无需担心thunk的执行顺序会对乐观UI产生影响。
