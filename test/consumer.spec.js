@@ -27,6 +27,10 @@ describe('consumer functions', () => {
             consume(second);
             expect(second.called).to.equal(true);
         });
+
+        it('should return the result of thunk', () => {
+            expect(consume(() => 1)).to.equal(1);
+        });
     });
 
     describe('series', () => {
@@ -44,6 +48,22 @@ describe('consumer functions', () => {
             expect(first.called).to.equal(true);
             consume(second);
             expect(second.called).to.equal(false);
+        });
+
+        it('should return a promise which resolves when thunk complete', async () => {
+            let [one, two] = await Promise.all([consume(() => Promise.resolve(1)), consume(() => 2)]);
+            expect(one).to.equal(1);
+            expect(two).to.equal(2);
+        });
+
+        it('should reject promise when thunk throws', async () => {
+            try {
+                let result = await consume(() => Promise.reject(2));
+                throw 'should not run this line of code';
+            }
+            catch (ex) {
+                expect(ex).to.equal(2);
+            }
         });
     });
 
@@ -63,6 +83,11 @@ describe('consumer functions', () => {
             expect(args[2]).to.equal(api);
             expect(args[3]).to.equal(globals);
         });
+
+        it('should return the result of thunk', () => {
+            let thunk = () => 1;
+            expect(consume(thunk)).to.equal(1);
+        });
     });
 
     describe('injectWith', () => {
@@ -80,6 +105,11 @@ describe('consumer functions', () => {
             expect(typeof args[1]).to.equal('function');
             expect(args[2]).to.equal(api);
             expect(args[3]).to.equal(globals);
+        });
+
+        it('should return the result of thunk', () => {
+            let thunk = () => 1;
+            expect(consume(thunk)).to.equal(1);
         });
     });
 });

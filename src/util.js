@@ -26,16 +26,22 @@ export let partial = (fn, arg) => () => fn(arg);
  * if job is synchronous then callback will be invoked synchronously
  *
  * @param {Function} job job to execute
- * @param {Function} next callback after job is done
+ * @param {Function} next callback after job returns or resolves
+ * @param {Function} error callback after job throws or rejects
  */
-export let doAndThen = (job, next) => {
-    let result = job();
+export let doAndThen = (job, next, error) => {
+    try {
+        let result = job();
 
-    if (isPromise(result)) {
-        return result.then(next);
+        if (isPromise(result)) {
+            return result.then(next, error);
+        }
+
+        return next(result);
     }
-
-    return next(result);
+    catch (ex) {
+        return error(ex);
+    }
 };
 
 let toString = Object.prototype.toString;

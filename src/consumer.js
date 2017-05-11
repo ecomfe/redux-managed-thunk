@@ -26,8 +26,18 @@ export let cocurrency = limit => run => {
 
     let takeNext = () => {
         if (pendings.length) {
-            let nextThunk = pendings.shift();
-            doAndThen(partial(run, nextThunk), takeNext);
+            let {thunk, resolve, reject} = pendings.shift();
+            doAndThen(
+                partial(run, thunk),
+                result => {
+                    resolve(result);
+                    takeNext();
+                },
+                error => {
+                    reject(error);
+                    takeNext();
+                }
+            );
         }
         else {
             currentlyRunningThunks--;
@@ -35,12 +45,15 @@ export let cocurrency = limit => run => {
     };
 
     return thunk => {
-        pendings.push(thunk);
+        let executor = (resolve, reject) => {
+            pendings.push({thunk, resolve, reject});
 
-        if (currentlyRunningThunks < limit) {
-            currentlyRunningThunks++;
-            takeNext();
-        }
+            if (currentlyRunningThunks < limit) {
+                currentlyRunningThunks++;
+                takeNext();
+            }
+        };
+        return new Promise(executor);
     };
 };
 
@@ -59,7 +72,7 @@ export let series = () => cocurrency(1);
  */
 export let inject = (...extraArguments) => run => thunk => {
     let withInjection = (...args) => thunk(...args, ...extraArguments);
-    run(withInjection);
+    return run(withInjection);
 };
 
 /**
@@ -70,7 +83,7 @@ export let inject = (...extraArguments) => run => thunk => {
  */
 export let injectWith = (...factories) => run => thunk => {
     let withInjection = (...args) => thunk(...args, ...factories.map(fn => fn()));
-    run(withInjection);
+    return run(withInjection);
 };
 
 /**
