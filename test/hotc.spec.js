@@ -16,8 +16,10 @@ describe('built-in higher order thunk creators', () => {
             expect(calls.length).to.equal(1);
             expect(calls[0]).to.deep.equal([1, 2, 3, 4, 5]);
             expect(firstCall).to.equal(secondCall);
-            let sum = await firstCall;
-            expect(sum).to.equal(15);
+            let firstSum = await firstCall;
+            expect(firstSum).to.equal(15);
+            let secondSum = await secondCall;
+            expect(secondSum).to.equal(15);
         });
 
         it('should not reuse previous if inputs are not equal', async () => {
