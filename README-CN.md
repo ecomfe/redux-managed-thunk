@@ -1,4 +1,7 @@
 # redux-managed-thunk
+[![building status](https://img.shields.io/travis/ecomfe/redux-managed-thunk.svg?style=flat)](https://travis-ci.org/ecomfe/redux-managed-thunk)
+[![Coverage Status](https://img.shields.io/coveralls/ecomfe/redux-managed-thunk.svg?style=flat)](https://coveralls.io/github/ecomfe/redux-managed-thunk)
+[![NPM version](https://img.shields.io/npm/v/redux-managed-thunk.svg?style=flat)](https://www.npmjs.com/package/redux-managed-thunk)
 
 redux-managed-thunk是一个redux中间件，基于thunk提供了强大的异步管理功能。
 
@@ -316,7 +319,7 @@ let deprecated = name => next => (...args) => {
 
 ## 乐观UI支持
 
-redux-managed-thunk同时支持乐观UI，你可以使用`optimisticEnhancer`这一命名导出来打开乐观UI的支持。`optimisticEnhancer`是一个Redux StoreEnhancer，用于`createStore`的第3个参数：
+redux-managed-thunk同时支持乐观UI，你可以使用`optimisticEnhancer`这一命名导出来打开乐观UI的支持。`optimisticEnhancer`是一个创建Redux StoreEnhancer的函数，用于`createStore`的第3个参数：
 
 ```javascript
 import {createStore} from 'redux';
@@ -339,7 +342,7 @@ let store = createStore(
         applyMiddleware(logger, saga),
         optimisticEnhancer({/* options */})
     )
-;
+);
 ```
 
 `optimisticEnhancer`函数接受一个`options`参数，参数定义与默认导出的`managedThunk`函数一致。
