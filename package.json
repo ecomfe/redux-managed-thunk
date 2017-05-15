@@ -4,11 +4,12 @@
   "description": "redux thunk with managed behaviors",
   "main": "index.js",
   "scripts": {
-    "lint": "fecs",
     "test": "cross-env NODE_ENV=test mocha",
     "test-cov": "npm run lint && cross-env NODE_ENV=test nyc --reporter=text --reporter=lcov --reporter=html mocha",
-    "compile": "gulp",
+    "report-cov": "cat coverage/lcov.info | coveralls",
     "ci": "npm run test-cov && npm run compile",
+    "lint": "fecs",
+    "compile": "gulp",
     "clean": "gulp clean",
     "prepublish": "npm run compile"
   },
@@ -34,6 +35,7 @@
     "babel-preset-stage-3": "^6.24.1",
     "babel-register": "^6.24.1",
     "chai": "^3.5.0",
+    "coveralls": "^2.13.1",
     "cross-env": "^4.0.0",
     "fecs": "^1.2.2",
     "gulp": "^3.9.1",
