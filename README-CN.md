@@ -41,7 +41,7 @@ let saveTodo = todo => async dispatch => {
     let savedTodo = await post('/todos', todo);
 
     // 使用dispatch.done标记结束
-    dispatch.done({type: 'ADD_TODO', palyoad: savedTodo});
+    dispatch.done({type: 'ADD_TODO', payload: savedTodo});
 };
 ```
 

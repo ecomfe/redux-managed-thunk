@@ -43,7 +43,7 @@ let saveTodo = todo => async dispatch => {
     let savedTodo = await post('/todos', todo);
 
     // dispatch.done to report success
-    dispatch.done({type: 'ADD_TODO', palyoad: savedTodo});
+    dispatch.done({type: 'ADD_TODO', payload: savedTodo});
 };
 ```
 
