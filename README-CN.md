@@ -7,6 +7,7 @@ redux-managed-thunk是一个redux中间件，基于thunk提供了强大的异步
 
 - [基本理念](#基本理念)
 - [基本使用方式](#基本使用方式)
+    - [与redux-thunk的差异](#与redux-thunk的差异)
 - [dispatch可用性限制](#dispatch可用性限制)
 - [使用consumer扩展中间件](#使用consumer扩展中间件)
     - [节流与串行化](#节流与串行化)
@@ -79,6 +80,14 @@ let store = createStore(
 
 - `{boolean} loose`：用于开启宽松模式，具体参考[dispatch可用性限制](#dispatch可用性限制)章节。
 - `{Function} consumer`：用于控制thunk的派发逻辑，具体参考[使用consumer扩展中间件](#使用consumer扩展中间件)章节。
+
+### 与redux-thunk的差异
+
+在一个redux中间件中，开发者可以访问到2个不同的`dispatch`函数，其一是挂载在`store`对象上的全局的`dispatch`函数，另一个被称之为`next`，用于访问中间件链中的后续中间件。
+
+redux-thunk在调用thunk时，将全局`dispatch`函数作为第一个参数传递给了thunk。但redux-managed-thunk使用的则是`next`函数，这是为了让[乐观UI](#乐观ui支持)可用而作出的设计。
+
+如果你只使用redux-managed-thunk这一个中间件，或者redux-managed-thunk是`applyMiddleware`的第一个参数，那么这一差异并不会产生任何的影响。但如果你在redux-managed-thunk的**前面**还有其它的中间件，那么需要注意在thunk中调用`dispatch`时，之前的中间件并不会起作用。
 
 ## dispatch可用性限制
 

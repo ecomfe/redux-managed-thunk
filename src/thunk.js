@@ -17,11 +17,12 @@ import {bypass} from './consumer';
  * @param {boolean} [options.loose = false] when set to `true`, `dispatch` will still be usable after thunk finishes
  * @return {Function} a redux middleware function
  */
-export default ({consumer = bypass(), loose = false} = {}) => ({dispatch, getState}) => {
+export default ({consumer = bypass(), loose = false} = {}) => ({dispatch, getState}) => next => {
+
     let runThunk = loose
-        ? thunk => thunk(dispatch, getState)
+        ? thunk => thunk(next, getState)
         : thunk => {
-            let [wrappedDispatch, replaceBehavior] = createDispatch(dispatch);
+            let [wrappedDispatch, replaceBehavior] = createDispatch(next);
             let thunkResult = thunk(wrappedDispatch, getState);
 
             if (isPromise(thunkResult)) {
@@ -36,7 +37,7 @@ export default ({consumer = bypass(), loose = false} = {}) => ({dispatch, getSta
 
     let consume = consumer(runThunk);
 
-    return next => action => {
+    return action => {
         if (typeof action !== 'function') {
             return next(action);
         }

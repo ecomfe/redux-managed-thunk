@@ -49,6 +49,7 @@ describe('optimisticEnhancer', () => {
     it('should rollback actions dispatched from optimistic thunk after actual thunk resolves', async () => {
         let reducer = (state, action) => {
             if (action.type === 'PUSH') {
+                console.log('receive', action);
                 return {...state, values: state.values.concat(action.payload)}
             };
             return state;
@@ -86,6 +87,31 @@ describe('optimisticEnhancer', () => {
             });
         };
         dispatch(errorThunk);
+    });
+
+    it('should replay actions out of thunks', async () => {
+        let reducer = (state, action) => {
+            if (action.type === 'PUSH') {
+                return {...state, values: state.values.concat(action.payload)}
+            };
+            return state;
+        };
+
+        let {dispatch, getState} = createStore(reducer, {values: []}, optimisticEnhancer());
+        let running = dispatch([
+            dispatch => {
+                dispatch({type: 'PUSH', payload: 1});
+                return Promise.resolve().then(() => dispatch({type: 'PUSH', payload: 4}));
+            },
+
+            dispatch => {
+                dispatch({type: 'PUSH', payload: 2});
+                dispatch({type: 'PUSH', payload: 3});
+            }
+        ]);
+        dispatch({type: 'PUSH', payload: 5});
+        await running;
+        expect(getState()).to.deep.equal({optimistic: false, values: [1, 5, 4]});
     });
 
     it('should pass options to managedThunk', () => {

@@ -41,7 +41,7 @@ let optimisticThunk = store => {
 
     return next => action => {
         if (!isOptimisticAction(action)) {
-            return next(action);
+            return next(postAction(action, null));
         }
 
         let [actualThunk, optimisticThunk] = action;
@@ -53,7 +53,7 @@ let optimisticThunk = store => {
         let thunkWithRollback = (dispatch, ...args) => {
             let dispatchWithRollback = action => {
                 if (isActualThunkReturned && !isRollbackCompleted) {
-                    rollback(transactionId);
+                    rollback(transactionId, next);
                     isRollbackCompleted = true;
                 }
 

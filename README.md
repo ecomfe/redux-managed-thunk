@@ -9,6 +9,7 @@ redux-managed-thunk is a redux middleware which allows you to dispatch thunks wi
 
 - [Oringinal idea](#oringinal-idea)
 - [How to use](#how-to-use)
+    - [Breaking changes with redux-thunk](#breaking-changes-with-redux-thunk)
 - [Limit on dispatch](#limit-on-dispatch)
 - [Use consumer to extend middleware](#use-consumer-to-extend-middleware)
     - [Cocurrency limit and series](#cocurrency-limit-and-series)
@@ -81,6 +82,14 @@ Note that unlike redux-thunk whose default export is a middleware already, `mana
 
 - `{boolean} loose`: enable loose mode, see [Limit on dispatch](#limit-on-dispatch) for detail.
 - `{Function} consumer`: a consumer function to control the dispatching of thunks, see [Use consumer to extend middleware](#use-consumer-to-extend-middleware) for detail.
+
+### Breaking changes with redux-thunk
+
+There are 2 `dispatch` functions in a redux middleware, one is the global `dispatch` attached with `store` object, the other one is what we called `next` in a middleware chain.
+
+redux-thunk provides the global `dispatch` function to thunks, however redux-managed-thunk provides the `next` function in order to make [optimistic UI](#optimistic-ui-support) to work.
+
+This will not introduce any issue if you only use one middleware or you place redux-managed-thunk as the first argument of `applyMiddleware` function, however if you have some other middlewares **before** redux-managed-thunk, note they will not apply when you call `dispatch` in a thunk.
 
 ## Limit on dispatch
 
