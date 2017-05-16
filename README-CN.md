@@ -356,7 +356,7 @@ let store = createStore(
 
 1. 执行第1个thunk，此时该thunk**同步**产生的action都将生效。
 2. 执行第2个thunk，该thunk产生的action都将生效。
-3. 等待第1个thunk完成，随后回滚第2个thunk产生的action。
+3. 等待第1个thunk第一次**异步**调用`dispatch`函数，随后回滚第2个thunk产生的action。
 4. 继续派发第1个thunk后续的action。
 
 redux-managed-thunk已经通过事务标注的形式处理了各个thunk之间的乱序问题，使用者无需担心thunk的执行顺序会对乐观UI产生影响。

@@ -8,7 +8,7 @@
 import {applyMiddleware, compose} from 'redux';
 import isPromise from 'is-promise';
 import {createOptimisticManager, createOptimisticReducer} from 'redux-optimistic-manager';
-import {isArray, partial} from './util';
+import {isArray} from './util';
 import managedThunk from './thunk';
 
 let isOptimisticAction = action => (
@@ -35,7 +35,7 @@ let optimisticThunk = store => {
     let {postAction, rollback} = createOptimisticManager(store);
 
     let withTransaction = (thunk, transactionId) => (dispatch, ...args) => {
-        let dispatchWithPost = action =>  dispatch(postAction(action, transactionId));
+        let dispatchWithPost = action => dispatch(postAction(action, transactionId));
         return thunk(dispatchWithPost, ...args);
     };
 
@@ -44,18 +44,32 @@ let optimisticThunk = store => {
             return next(action);
         }
 
-
         let [actualThunk, optimisticThunk] = action;
         // transactionId can be any object, but here we use a number for debugging support
         let transactionId = uid();
 
-        let actualThunkRunning = next(withTransaction(actualThunk, null));
+        let isActualThunkReturned = false;
+        let isRollbackCompleted = false;
+        let thunkWithRollback = (dispatch, ...args) => {
+            let dispatchWithRollback = action => {
+                if (isActualThunkReturned && !isRollbackCompleted) {
+                    rollback(transactionId);
+                    isRollbackCompleted = true;
+                }
+
+                return dispatch(action);
+            };
+            return actualThunk(dispatchWithRollback, ...args);
+        };
+
+        let actualThunkRunning = next(withTransaction(thunkWithRollback, null));
 
         if (!isPromise(actualThunkRunning)) {
             throw new Error('Actual thunk of optimistic action must be async');
         }
 
-        actualThunkRunning.then(partial(rollback, transactionId));
+        isActualThunkReturned = true;
+
         let optimisticThunkReturn = next(withTransaction(optimisticThunk, transactionId));
 
         if (isPromise(optimisticThunkReturn)) {

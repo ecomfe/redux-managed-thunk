@@ -356,7 +356,7 @@ On receiving the array, redux-managed-thunk will perform steps listed below:
 
 1. Run the first thunk, all **synchronously dispatched** actions will be applied.
 2. Run the second thunk, all actions will be applied.
-3. Wait for the first thunk to resolve, then rollback actions created from the second thunk.
+3. Wait for the first thunk to invoke `dispatch` **asynchronously**, then rollback actions produced by the second thunk.
 4. Dispatch asynchronous actions from the first thunk.
 
 redux-managed-thunk uses a transaction based mechanism to manage all thunks, there will be no race conditions in optimistic UI.
