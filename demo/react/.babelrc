@@ -1,0 +1,7 @@
+{
+    "presets": ["react", "stage-0"],
+    "plugins": [
+        "react-require",
+        "transform-es2015-modules-umd"
+    ]
+}

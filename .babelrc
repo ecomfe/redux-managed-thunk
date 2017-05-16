@@ -10,7 +10,7 @@
             "presets": ["stage-3"],
             "plugins": ["transform-es2015-modules-umd", "istanbul"]
         },
-        "example": {
+        "demo": {
             "presets": ["stage-3"],
             "plugins": ["transform-es2015-modules-umd"]
         }

@@ -1,6 +1,7 @@
 {
     "files": [
-        "src"
+        "src",
+        "demo"
     ],
     "eslint": {
         "rules": {

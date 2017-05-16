@@ -89,6 +89,13 @@ redux-thunk在调用thunk时，将全局`dispatch`函数作为第一个参数传
 
 如果你只使用redux-managed-thunk这一个中间件，或者redux-managed-thunk是`applyMiddleware`的第一个参数，那么这一差异并不会产生任何的影响。但如果你在redux-managed-thunk的**前面**还有其它的中间件，那么需要注意在thunk中调用`dispatch`时，之前的中间件并不会起作用。
 
+### 使用DEMO
+
+本仓库带有2个DEMO：
+
+- `npm run demo-cli`将启动一个命令行程序展现[乐观UI](#乐观ui支持)的工作过程。
+- `npm run demo-react`将启动webpack-dev-server运行一个react应用，在应用中展现了[consumer函数](#使用consumer扩展中间件)和[乐观UI](#乐观ui支持)的使用方式。
+
 ## dispatch可用性限制
 
 redux-managed-thukn会对`dispatch`参数增加一些限制：
